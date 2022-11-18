@@ -5,7 +5,8 @@ import cv2
 import mmcv
 import numpy as np
 from mmdet.datasets.pipelines.transforms import (Mosaic, RandomCrop,
-                                                 RandomFlip, Resize)
+                                                 RandomFlip, Resize,
+                                                 Normalize)
 from numpy import random
 
 from mmrotate.core import norm_angle, obb2poly_np, poly2obb_np
@@ -44,6 +45,9 @@ class RResize(Resize):
             bboxes[:, 1] *= h_scale
             bboxes[:, 2:4] *= np.sqrt(w_scale * h_scale)
             results[key] = bboxes.reshape(orig_shape)
+
+        tmp=1331
+        tmp+=1
 
 
 @ROTATED_PIPELINES.register_module()
@@ -544,3 +548,54 @@ class RMosaic(Mosaic):
                      (bbox_h > self.min_bbox_size)
         valid_inds = np.nonzero(valid_inds)[0]
         return bboxes[valid_inds], labels[valid_inds]
+
+## 重写Normalize
+@ROTATED_PIPELINES.register_module()
+class MaskNormalize(Normalize):
+    """Normalize the image.
+
+    Added key is "img_norm_cfg".
+
+    Args:
+        mean (sequence): Mean values of 3 channels.
+        std (sequence): Std values of 3 channels.
+        to_rgb (bool): Whether to convert the image from BGR to RGB,
+            default is true.
+    """
+
+    def __init__(self, mean, std, to_rgb=True):
+        self.mean = np.array(mean, dtype=np.float32)
+        self.std = np.array(std, dtype=np.float32)
+        self.to_rgb = to_rgb
+
+    def __call__(self, results):
+        """Call function to normalize images.
+
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Normalized results, 'img_norm_cfg' key is added into
+                result dict.
+        """
+        for key in results.get('img_fields', ['img']):
+            mask=mask=np.expand_dims(results[key][:,:,-1],axis=2) # 扩充维度
+
+            # results[key] = mmcv.imnormalize(results[key], self.mean, self.std,
+            #                                 self.to_rgb)
+            results[key] = mmcv.imnormalize(results[key][:,:,:3], self.mean, self.std,
+                                            self.to_rgb)  # 改为适合4通道,只输入前3个通道
+            results[key]=np.concatenate((results[key],mask),axis=2)  # 重新拼接
+
+        results['img_norm_cfg'] = dict(
+            mean=self.mean, std=self.std, to_rgb=self.to_rgb)
+
+
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(mean={self.mean}, std={self.std}, to_rgb={self.to_rgb})'
+        return repr_str
+
+
