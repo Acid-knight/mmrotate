@@ -126,12 +126,11 @@ def get_single_pt_via_mask(root, out_path, dis_threshold):
             ct_y = np.mean(ins_pxs[1])
             ## 2)计算实例所有点到重心的区域
             # 计算每个点到重心的平面距离
-            # 将 ins_pxs 转换为形状为 (n, 2) 的数组
             ins_pxs = np.column_stack((ins_pxs[0], ins_pxs[1]))
             # 计算每个点到重心的欧氏距离
             distances = cdist(ins_pxs, [[ct_x, ct_y]])
             ## 3)选出随机点
-            # 获取最小值和最大值
+            # 获取最小距离和最大距离
             min_dis = np.min(distances)
             max_dis = np.max(distances)
             dis_thr = min_dis + (max_dis - min_dis) * dis_threshold  # 范围比例
